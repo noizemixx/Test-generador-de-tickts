@@ -35,11 +35,27 @@ docker compose up --build
 
 Abre [http://localhost:5000](http://localhost:5000) en el navegador.
 
-Para detener y eliminar el contenedor:
+### Detener Docker Compose
+
+Si ejecutaste el servicio en primer plano con `docker compose up --build`, presiona:
+
+```text
+Ctrl + C
+```
+
+Esto detiene el proceso que muestra los logs. Para detener y eliminar el contenedor de forma explícita, ejecuta desde otra terminal o después de volver al prompt:
 
 ```bash
 docker compose down
 ```
+
+Si lo levantaste en segundo plano con `-d`, no necesitas `Ctrl + C`; basta con ejecutar:
+
+```bash
+docker compose down
+```
+
+Este comando detiene y elimina los contenedores creados por Compose. La imagen no se elimina y podrá reutilizarse en el siguiente arranque.
 
 Para ejecutarlo en segundo plano:
 
@@ -70,6 +86,22 @@ python app.py
 ```
 
 La aplicación escucha en `http://localhost:5000`.
+
+### Detener la ejecución de Python
+
+Si arrancaste la aplicación con `python app.py`, mantén enfocada la terminal donde está ejecutándose y presiona:
+
+```text
+Ctrl + C
+```
+
+Python recibirá la señal de interrupción y el servidor Flask se cerrará. Después puedes salir del entorno virtual con:
+
+```bash
+deactivate
+```
+
+`deactivate` solo desactiva el entorno virtual; no es necesario para detener el servidor.
 
 ## Configuración
 
