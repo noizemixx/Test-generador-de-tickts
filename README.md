@@ -69,6 +69,44 @@ Para consultar los logs:
 docker compose logs -f
 ```
 
+### Administrar el contenedor directamente
+
+También puedes administrar el contenedor usando su ID o nombre. Sustituye
+`a842945e2414` por el valor que aparezca en `docker ps`:
+
+```bash
+docker ps
+```
+
+Detenerlo de forma normal envía `SIGTERM` y permite que la aplicación cierre
+correctamente:
+
+```bash
+docker stop a842945e2414
+```
+
+Forzar su detención envía `SIGKILL`. Úsalo solo si `docker stop` no responde:
+
+```bash
+docker kill a842945e2414
+```
+
+Reiniciar el contenedor:
+
+```bash
+docker restart a842945e2414
+```
+
+Eliminar un contenedor detenido:
+
+```bash
+docker rm a842945e2414
+```
+
+Para servicios iniciados con Docker Compose, `docker compose down` sigue siendo
+la opción recomendada porque detiene y elimina los recursos del proyecto de
+forma coordinada.
+
 ## Ejecutar localmente
 
 Crear y activar un entorno virtual:
