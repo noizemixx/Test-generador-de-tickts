@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TicketFlow | Tickets guardados</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">T</span><span>TicketFlow</span></a>
+        <nav class="top-nav"><a href="{{ url_for('index') }}">＋ Nuevo ticket</a></nav>
+      </header>
+      <section class="hero">
+        <p class="eyebrow">Mesa de ayuda</p>
+        <h1>Tickets guardados</h1>
+        <p class="hero-copy">Consulta las solicitudes y abre su historial de versiones.</p>
+      </section>
+      <section class="card list-card">
+        {% if tickets %}
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Ticket</th><th>Asunto</th><th>Solicitante</th><th>Prioridad</th><th>Versiones</th><th></th></tr></thead>
+              <tbody>
+                {% for ticket in tickets %}
+                  <tr>
+                    <td><a class="ticket-link" href="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">{{ ticket.number }}</a></td>
+                    <td>{{ ticket.subject }}</td>
+                    <td>{{ ticket.requester }}</td>
+                    <td><span class="priority {{ ticket.priority_class }}">{{ ticket.priority_label }}</span></td>
+                    <td>{{ ticket.version_count }}</td>
+                    <td><a href="{{ url_for('ticket_history', ticket_id=ticket.id) }}">Historial</a></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <div class="ticket-icon">✦</div>
+            <h2>Aún no hay tickets</h2>
+            <p>Cuando crees una solicitud, aparecerá aquí.</p>
+            <a class="primary-link" href="{{ url_for('index') }}">Crear primer ticket</a>
+          </div>
+        {% endif %}
+      </section>
+      <footer>TicketFlow · Historial de cambios por ticket</footer>
+    </main>
+  </body>
+</html>

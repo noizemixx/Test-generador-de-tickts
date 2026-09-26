@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Editar {{ ticket.number }} | TicketFlow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">T</span><span>TicketFlow</span></a>
+        <nav class="top-nav"><a href="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">Cancelar edición</a></nav>
+      </header>
+      <section class="hero compact-hero">
+        <p class="eyebrow">Editar solicitud</p>
+        <h1>{{ ticket.number }}</h1>
+        <p class="hero-copy">Al guardar, se conservará la versión actual en el historial.</p>
+      </section>
+      <section class="workspace single-column">
+        <form class="card form-card" method="post">
+          <div class="card-heading"><div><p class="section-kicker">Nueva versión</p><h2>Actualiza los datos del ticket</h2></div></div>
+          {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+          <div class="field-grid">
+            <label>Solicitante
+              <input name="requester" type="text" required value="{{ request.form.get('requester', ticket.requester) }}">
+            </label>
+            <label>Correo electrónico
+              <input name="email" type="email" required value="{{ request.form.get('email', ticket.email) }}">
+            </label>
+          </div>
+          <div class="field-grid">
+            <label>Categoría
+              <select name="category">
+                {% for option in categories %}
+                  <option value="{{ option }}" {% if request.form.get('category', ticket.category) == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Prioridad
+              <select name="priority">
+                {% for value, label in [("baja", "Baja"), ("media", "Media"), ("alta", "Alta"), ("critica", "Crítica")] %}
+                  <option value="{{ value }}" {% if request.form.get('priority', ticket.priority) == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <label>Asunto
+            <input name="subject" type="text" required value="{{ request.form.get('subject', ticket.subject) }}">
+          </label>
+          <label>Descripción
+            <textarea name="description" rows="6" required>{{ request.form.get('description', ticket.description) }}</textarea>
+          </label>
+          <button class="primary-button" type="submit">Guardar nueva versión <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+      <footer>TicketFlow · El historial anterior no se sobrescribe</footer>
+    </main>
+  </body>
+</html>

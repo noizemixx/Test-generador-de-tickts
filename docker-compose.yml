@@ -3,4 +3,11 @@ services:
     build: .
     ports:
       - "5000:5000"
+    environment:
+      TICKETFLOW_DB: /data/ticketflow.sqlite3
+    volumes:
+      - ticketflow_data:/data
     restart: unless-stopped
+
+volumes:
+  ticketflow_data:
