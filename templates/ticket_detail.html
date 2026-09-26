@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ ticket.number }} | TicketFlow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">T</span><span>TicketFlow</span></a>
+        <nav class="top-nav"><a href="{{ url_for('tickets') }}">Todos los tickets</a></nav>
+      </header>
+      <section class="hero compact-hero">
+        <p class="eyebrow">Detalle del ticket</p>
+        <h1>{{ ticket.number }}</h1>
+      </section>
+      <section class="card detail-card">
+        <div class="preview-top">
+          <div><p class="section-kicker">Versión actual</p><h2>{{ ticket.subject }}</h2></div>
+          <span class="priority {{ ticket.priority_class }}">{{ ticket.priority_label }}</span>
+        </div>
+        <div class="ticket-divider"></div>
+        <p class="ticket-description">{{ ticket.description }}</p>
+        <dl class="ticket-meta">
+          <div><dt>Solicitante</dt><dd>{{ ticket.requester }}</dd></div>
+          <div><dt>Correo</dt><dd>{{ ticket.email }}</dd></div>
+          <div><dt>Categoría</dt><dd>{{ ticket.category }}</dd></div>
+          <div><dt>Creado</dt><dd>{{ ticket.created_at|local_time }}</dd></div>
+          <div><dt>Última actualización</dt><dd>{{ ticket.updated_at|local_time }}</dd></div>
+        </dl>
+        <div class="action-row">
+          <a class="primary-link" href="{{ url_for('edit_ticket', ticket_id=ticket.id) }}">Editar ticket</a>
+          <a class="secondary-link" href="{{ url_for('ticket_history', ticket_id=ticket.id) }}">Ver historial de versiones</a>
+        </div>
+      </section>
+      <footer>TicketFlow · Las ediciones se guardan como nuevas versiones</footer>
+    </main>
+  </body>
+</html>

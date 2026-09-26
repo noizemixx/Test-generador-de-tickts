@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Historial {{ ticket.number }} | TicketFlow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">T</span><span>TicketFlow</span></a>
+        <nav class="top-nav"><a href="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">Volver al ticket</a></nav>
+      </header>
+      <section class="hero">
+        <p class="eyebrow">Historial de versiones</p>
+        <h1>{{ ticket.number }}</h1>
+        <p class="hero-copy">Cada registro es una copia inmutable de los datos guardados en esa edición.</p>
+      </section>
+      <section class="version-list">
+        {% for version in versions %}
+          <article class="card version-card">
+            <div class="version-heading">
+              <div><p class="section-kicker">Versión {{ version.version }}</p><h2>{{ version.subject }}</h2></div>
+              <span class="version-date">{{ version.changed_at|local_time }}</span>
+            </div>
+            <div class="version-badges">
+              <span class="priority {{ version.priority_class }}">{{ version.priority_label }}</span>
+              <span class="plain-badge">{{ version.category }}</span>
+            </div>
+            <p class="ticket-description">{{ version.description }}</p>
+            <dl class="ticket-meta">
+              <div><dt>Solicitante</dt><dd>{{ version.requester }}</dd></div>
+              <div><dt>Correo</dt><dd>{{ version.email }}</dd></div>
+            </dl>
+          </article>
+        {% endfor %}
+      </section>
+      <footer>TicketFlow · Se muestran primero las versiones más recientes</footer>
+    </main>
+  </body>
+</html>

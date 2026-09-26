@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>TicketFlow | Generador de tickets</title>
+    <title>TicketFlow | Nuevo ticket</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
@@ -13,25 +13,24 @@
           <span class="brand-mark">T</span>
           <span>TicketFlow</span>
         </a>
-        <span class="status"><span class="status-dot"></span> Servicio operativo</span>
+        <nav class="top-nav"><a href="{{ url_for('tickets') }}">Tickets guardados</a></nav>
       </header>
 
       <section class="hero">
         <p class="eyebrow">Mesa de ayuda</p>
         <h1>Generador de tickets</h1>
-        <p class="hero-copy">Registra una solicitud y crea un ticket listo para compartir con tu equipo.</p>
+        <p class="hero-copy">Registra una solicitud y conserva su historial de cambios.</p>
       </section>
 
-      <section class="workspace">
+      <section class="workspace single-column">
         <form class="card form-card" method="post">
           <div class="card-heading">
             <div>
               <p class="section-kicker">Nueva solicitud</p>
               <h2>Cuéntanos qué necesitas</h2>
             </div>
-            <span class="step-badge">1 de 1</span>
           </div>
-
+          {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
           <div class="field-grid">
             <label>
               Solicitante
@@ -42,13 +41,12 @@
               <input name="email" type="email" placeholder="ana@empresa.com" required value="{{ request.form.get('email', '') }}">
             </label>
           </div>
-
           <div class="field-grid">
             <label>
               Categoría
               <select name="category">
-                {% for option in ["Soporte", "Acceso y cuentas", "Hardware", "Software", "Redes", "Otro"] %}
-                  <option {% if request.form.get('category', 'Soporte') == option %}selected{% endif %}>{{ option }}</option>
+                {% for option in categories %}
+                  <option value="{{ option }}" {% if request.form.get('category', 'Soporte') == option %}selected{% endif %}>{{ option }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -61,65 +59,18 @@
               </select>
             </label>
           </div>
-
           <label>
             Asunto
             <input name="subject" type="text" placeholder="Resume tu solicitud en una frase" required value="{{ request.form.get('subject', '') }}">
           </label>
-
           <label>
             Descripción
             <textarea name="description" rows="6" placeholder="Añade los detalles que ayudarán a resolverla..." required>{{ request.form.get('description', '') }}</textarea>
           </label>
-
-          <button class="primary-button" type="submit">Generar ticket <span aria-hidden="true">→</span></button>
+          <button class="primary-button" type="submit">Guardar ticket <span aria-hidden="true">→</span></button>
         </form>
-
-        <aside class="card preview-card" aria-live="polite">
-          {% if ticket %}
-            <div class="preview-top">
-              <div>
-                <p class="section-kicker">Ticket generado</p>
-                <h2>{{ ticket.number }}</h2>
-              </div>
-              <span class="priority {{ ticket.priority_class }}">{{ ticket.priority }}</span>
-            </div>
-            <div class="ticket-divider"></div>
-            <h3>{{ ticket.subject }}</h3>
-            <p class="ticket-description">{{ ticket.description }}</p>
-            <dl class="ticket-meta">
-              <div><dt>Solicitante</dt><dd>{{ ticket.requester }}</dd></div>
-              <div><dt>Correo</dt><dd>{{ ticket.email }}</dd></div>
-              <div><dt>Categoría</dt><dd>{{ ticket.category }}</dd></div>
-              <div><dt>Creado</dt><dd>{{ ticket.created_at }}</dd></div>
-            </dl>
-            <button class="secondary-button" type="button" onclick="copyTicket()">Copiar resumen</button>
-            <textarea id="ticket-summary" class="visually-hidden">Ticket {{ ticket.number }}
-Asunto: {{ ticket.subject }}
-Solicitante: {{ ticket.requester }} ({{ ticket.email }})
-Categoría: {{ ticket.category }} | Prioridad: {{ ticket.priority }}
-Descripción: {{ ticket.description }}</textarea>
-          {% else %}
-            <div class="empty-preview">
-              <div class="ticket-icon">✦</div>
-              <p class="section-kicker">Vista previa</p>
-              <h2>Tu ticket aparecerá aquí</h2>
-              <p>Completa el formulario para generar un identificador y compartir todos los detalles.</p>
-            </div>
-          {% endif %}
-        </aside>
       </section>
-      <footer>TicketFlow · Generación local y segura</footer>
+      <footer>TicketFlow · Tickets e historial almacenados localmente</footer>
     </main>
-    <script>
-      function copyTicket() {
-        const summary = document.getElementById("ticket-summary");
-        navigator.clipboard.writeText(summary.value).then(() => {
-          const button = document.querySelector(".secondary-button");
-          button.textContent = "¡Resumen copiado!";
-          setTimeout(() => button.textContent = "Copiar resumen", 1800);
-        });
-      }
-    </script>
   </body>
 </html>
