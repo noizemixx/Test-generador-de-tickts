@@ -1,235 +1,230 @@
 # TicketFlow
 
-Aplicación web para generar tickets de mesa de ayuda de forma rápida y clara. Permite registrar el solicitante, correo electrónico, categoría, prioridad, asunto y descripción. Al enviar el formulario, genera un identificador único y muestra una vista previa lista para compartir.
+Aplicación web para generar y administrar tickets de mesa de ayuda. Guarda tickets e historial de versiones en SQLite para uso local y PostgreSQL para despliegues productivos con Docker Swarm.
 
 ## Funcionalidades
 
 - Formulario responsive en español.
-- Categorías: soporte, acceso y cuentas, hardware, software, redes y otros.
-- Niveles de prioridad: baja, media, alta y crítica.
-- Identificador automático con formato `TCK-YYYYMMDD-000001`.
-- Almacenamiento persistente de tickets en SQLite.
-- Edición de tickets con una nueva versión por cada guardado.
-- Consulta del detalle e historial completo, incluyendo la versión inicial.
-- Servidor de producción con Gunicorn.
-- Despliegue reproducible mediante Docker Compose.
+- Categorías y prioridades configurables.
+- Identificador automático para cada ticket.
+- Edición con una nueva versión por guardado, sin sobrescribir el historial.
+- Vistas para listar tickets, consultar detalles y revisar versiones anteriores.
+- Persistencia seleccionable entre SQLite y PostgreSQL.
+- Health check HTTP en `/health`.
 
 ## Requisitos
 
-Para ejecutar con Docker:
+- Docker Engine con Docker Swarm habilitado para los stacks.
+- Un nodo manager; para producción, un registry accesible por todos los nodos.
+- Python 3.11 o superior y `pip` para ejecución local.
 
-- Docker Engine.
-- Docker Compose v2 (`docker compose`).
+## Desarrollo local con Docker Compose
 
-Para ejecutar sin Docker:
-
-- Python 3.11 o superior.
-- `pip`.
-
-## Ejecutar con Docker
-
-Construye la imagen y levanta el servicio:
+Construye y levanta la aplicación con SQLite:
 
 ```bash
 docker compose up --build
 ```
 
-Abre [http://localhost:5000](http://localhost:5000) en el navegador.
+Abre [http://localhost:5000](http://localhost:5000). Los datos se guardan en el volumen `ticketflow_local_data`.
 
-### Detener Docker Compose
-
-Si ejecutaste el servicio en primer plano con `docker compose up --build`, presiona:
-
-```text
-Ctrl + C
-```
-
-Esto detiene el proceso que muestra los logs. Para detener y eliminar el contenedor de forma explícita, ejecuta desde otra terminal o después de volver al prompt:
+Para detener y eliminar los contenedores, conservando el volumen:
 
 ```bash
 docker compose down
 ```
 
-Si lo levantaste en segundo plano con `-d`, no necesitas `Ctrl + C`; basta con ejecutar:
+Para borrar también todos los tickets locales:
 
 ```bash
-docker compose down
+docker compose down -v
 ```
 
-Este comando detiene y elimina los contenedores creados por Compose. La imagen no se elimina y podrá reutilizarse en el siguiente arranque.
-Los tickets se guardan en el volumen Docker `ticketflow_data`, por lo que siguen disponibles al detener o recrear el contenedor.
-
-> **Importante:** `docker compose down -v` también elimina el volumen y borra todos los tickets guardados.
-
-Para ejecutarlo en segundo plano:
+Para levantarlo en segundo plano y consultar los logs:
 
 ```bash
 docker compose up --build -d
-```
-
-Para consultar los logs:
-
-```bash
 docker compose logs -f
 ```
 
-### Administrar el contenedor directamente
+## Docker Swarm: testing local con SQLite
 
-También puedes administrar el contenedor usando su ID o nombre. Sustituye
-`a842945e2414` por el valor que aparezca en `docker ps`:
-
-```bash
-docker ps
-```
-
-Detenerlo de forma normal envía `SIGTERM` y permite que la aplicación cierre
-correctamente:
+Este stack es para pruebas en un Swarm de un solo nodo. SQLite está configurado con una sola réplica, fijada al nodo que contiene su volumen local:
 
 ```bash
-docker stop a842945e2414
+docker swarm init
+docker node update --label-add ticketflow.sqlite=true "$(docker node ls -q | head -n 1)"
+docker build -t ticketflow:local .
+docker stack deploy -c docker-stack.test.yml ticketflow-test
 ```
 
-Forzar su detención envía `SIGKILL`. Úsalo solo si `docker stop` no responde:
+Visita [http://localhost:5000](http://localhost:5000) y consulta el estado/logs:
 
 ```bash
-docker kill a842945e2414
+docker stack services ticketflow-test
+docker service logs -f ticketflow-test_ticketflow
 ```
 
-Reiniciar el contenedor:
+Detener y eliminar el stack **sin perder los datos**:
 
 ```bash
-docker restart a842945e2414
+docker stack rm ticketflow-test
 ```
 
-Eliminar un contenedor detenido:
+Volver a desplegarlo conserva el volumen `ticketflow_test_data`. Para eliminar definitivamente los tickets:
 
 ```bash
-docker rm a842945e2414
+docker volume rm ticketflow_test_data
 ```
 
-Para servicios iniciados con Docker Compose, `docker compose down` sigue siendo
-la opción recomendada porque detiene y elimina los recursos del proyecto de
-forma coordinada.
+No escales este servicio ni muevas el volumen local a otro nodo. SQLite no está configurado para uso concurrente entre réplicas.
 
-## Ejecutar localmente
+## Docker Swarm: producción con PostgreSQL
 
-Crear y activar un entorno virtual:
+El stack productivo despliega dos réplicas web que comparten PostgreSQL. La base de datos usa un volumen local y se fija a un nodo concreto; no es una configuración PostgreSQL de alta disponibilidad.
+
+PostgreSQL comienza con su propia base vacía; los tickets existentes en SQLite no se copian automáticamente.
+
+### Preparar Swarm y secreto de base de datos
+
+Inicializa Swarm si todavía no está activo y etiqueta el nodo donde se alojará PostgreSQL:
+
+```bash
+docker swarm init
+docker node update --label-add ticketflow.postgres=true <ID_DEL_NODO>
+```
+
+Crea el secreto de contraseña de manera interactiva para que no quede escrito en el historial del shell:
+
+```bash
+read -rsp "Contraseña de PostgreSQL: " TICKETFLOW_DB_PASSWORD
+printf '%s' "$TICKETFLOW_DB_PASSWORD" | docker secret create ticketflow_db_password -
+unset TICKETFLOW_DB_PASSWORD
+```
+
+### Publicar la imagen
+
+Todos los nodos deben poder descargar la imagen desde el registry. Inicia sesión y publica una etiqueta versionada:
+
+```bash
+docker login ghcr.io
+export TICKETFLOW_IMAGE=ghcr.io/USUARIO/test-generador-de-tickts:1.0.0
+docker build -t "$TICKETFLOW_IMAGE" .
+docker push "$TICKETFLOW_IMAGE"
+```
+
+### Desplegar y administrar el stack
+
+```bash
+docker stack deploy --with-registry-auth \
+  -c docker-stack.production.yml ticketflow
+```
+
+La web queda publicada en el puerto `5000` de los nodos Swarm. Revisa servicios y logs:
+
+```bash
+docker stack services ticketflow
+docker service logs -f ticketflow_web
+docker service logs -f ticketflow_db
+```
+
+Escala las réplicas web cuando lo necesites:
+
+```bash
+docker service scale ticketflow_web=3
+```
+
+Detén y elimina los servicios conservando la base de datos:
+
+```bash
+docker stack rm ticketflow
+```
+
+El volumen `ticketflow_postgres_data` permanece después de quitar el stack. **No lo elimines si necesitas conservar los tickets.** Su borrado es destructivo:
+
+```bash
+docker volume rm ticketflow_postgres_data
+```
+
+Antes de producción, configura copias de seguridad PostgreSQL, almacenamiento duradero, firewall/TLS y autenticación. La aplicación aún no incluye autenticación de usuarios.
+
+## Ejecutar localmente con Python
+
+Crear y activar un entorno virtual, instalar dependencias e iniciar con SQLite:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-```
-
-Instalar dependencias y arrancar:
-
-```bash
 pip install -r requirements.txt
 python app.py
 ```
 
-La aplicación escucha en `http://localhost:5000`.
-En ejecución local, la base de datos se crea en `instance/ticketflow.sqlite3`. Puedes cambiar su ubicación definiendo la variable de entorno `TICKETFLOW_DB`.
-
-### Detener la ejecución de Python
-
-Si arrancaste la aplicación con `python app.py`, mantén enfocada la terminal donde está ejecutándose y presiona:
-
-```text
-Ctrl + C
-```
-
-Python recibirá la señal de interrupción y el servidor Flask se cerrará. Después puedes salir del entorno virtual con:
+Abre [http://localhost:5000](http://localhost:5000). La base local se crea en `instance/ticketflow.sqlite3`; puedes configurar otra ruta con `TICKETFLOW_DB`. Para detener el servidor, presiona `Ctrl + C`. Salir del entorno virtual es opcional:
 
 ```bash
 deactivate
 ```
 
-`deactivate` solo desactiva el entorno virtual; no es necesario para detener el servidor.
+## Configuración de base de datos
 
-## Configuración
+La aplicación selecciona el backend con estas variables:
 
-El puerto expuesto por Docker se define en `docker-compose.yml`:
+- SQLite local: `TICKETFLOW_DB` (si no se configura, `instance/ticketflow.sqlite3`).
+- PostgreSQL con URL: `DATABASE_URL`.
+- PostgreSQL por variables: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` o `POSTGRES_PASSWORD_FILE`.
 
-```yaml
-ports:
-  - "5000:5000"
-```
-
-Por ejemplo, para acceder desde el puerto `8080` del equipo host:
-
-```yaml
-ports:
-  - "8080:5000"
-```
-
-El servidor interno permanece escuchando en el puerto `5000`.
-
-## Estructura del proyecto
-
-```text
-.
-├── app.py                 # Rutas Flask, SQLite y versiones
-├── templates/             # Formularios, tickets e historial
-├── static/style.css       # Estilos responsive
-├── Dockerfile             # Imagen de producción
-├── docker-compose.yml     # Servicio, puerto y volumen persistente
-└── requirements.txt       # Dependencias Python
-```
+El stack de producción monta el secreto en `/run/secrets/ticketflow_db_password`. No guardes contraseñas en el repositorio.
 
 ## Ejecutar las pruebas
-
-El proyecto incluye pruebas de creación, edición, persistencia e historial. Instala pytest y ejecútalas:
 
 ```bash
 python -m pip install pytest
 python -m pytest
 ```
 
+Las pruebas cubren la creación, edición, historial, validación y tickets inexistentes usando SQLite temporal.
+
 ## Control de versiones con Git
 
-Clona el repositorio y entra en la carpeta del proyecto:
+Clonar el repositorio:
 
 ```bash
 git clone https://github.com/noizemixx/Test-generador-de-tickts.git
 cd Test-generador-de-tickts
 ```
 
-Para trabajar en un cambio, crea una rama propia:
+Crear una rama y guardar los cambios:
 
 ```bash
 git switch -c feature/nombre-del-cambio
-```
-
-Después de editar, revisa los archivos modificados, prepara los cambios y crea un commit:
-
-```bash
 git status
 git add README.md app.py
 git commit -m "Describe el cambio"
-```
-
-Publica la rama en GitHub:
-
-```bash
 git push -u origin feature/nombre-del-cambio
 ```
 
-Abre un Pull Request de esa rama hacia `main`. Para incorporar cambios recientes de `main` a tu rama:
+Abre un Pull Request de esa rama hacia `main`. Para sincronizar cambios nuevos de `main`:
 
 ```bash
 git fetch origin
 git merge origin/main
 ```
 
-La base SQLite y los archivos de instancia están excluidos de Git; los datos locales de tickets no se suben al repositorio.
+La base de datos y los datos persistidos no se suben a Git.
 
-## Almacenamiento y limitaciones
+## Estructura del proyecto
 
-Los tickets actuales y todas sus versiones se almacenan en SQLite. Las versiones anteriores no se sobrescriben: al editar un ticket se añade una revisión nueva, que se puede consultar desde el detalle del ticket.
-
-Docker Compose conserva los datos en el volumen nombrado `ticketflow_data`. La aplicación local usa `instance/ticketflow.sqlite3`. SQLite es adecuado para una instancia pequeña o de un solo servidor; para varias instancias concurrentes o un despliegue de alta disponibilidad, conviene migrar a PostgreSQL y configurar almacenamiento y copias de seguridad administrados.
-
-La aplicación todavía no incluye autenticación ni permisos por usuario.
+```text
+.
+├── app.py                     # Rutas Flask, SQLAlchemy y configuración de DB
+├── templates/                 # Formulario, tickets e historial
+├── static/style.css           # Estilos responsive
+├── docker-compose.yml         # Desarrollo local con SQLite
+├── docker-stack.test.yml      # Swarm de testing con SQLite
+├── docker-stack.production.yml # Swarm de producción con PostgreSQL
+├── Dockerfile
+└── requirements.txt
+```
 
 ## Licencia
 
