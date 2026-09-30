@@ -1,16 +1,26 @@
-import pytest
+import sqlite3
 
-from app import app, initialize_database
+import pytest
+from flask import Flask
+
+from app import create_app, database_uri, db
 
 
 @pytest.fixture
 def client(tmp_path):
-    original_path = app.config["DATABASE_PATH"]
-    app.config.update(TESTING=True, DATABASE_PATH=str(tmp_path / "tickets.sqlite3"))
-    initialize_database()
-    with app.test_client() as test_client:
+    test_app = create_app(
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'tickets.sqlite3'}",
+        }
+    )
+    with test_app.app_context():
+        db.drop_all()
+        db.create_all()
+    with test_app.test_client() as test_client:
         yield test_client
-    app.config["DATABASE_PATH"] = original_path
+    with test_app.app_context():
+        db.drop_all()
 
 
 def ticket_form(**overrides):
@@ -74,3 +84,79 @@ def test_invalid_ticket_form_is_rejected(client):
 
 def test_missing_ticket_returns_not_found(client):
     assert client.get("/tickets/999/history").status_code == 404
+
+
+def test_health_check_reports_database_connection(client):
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json == {"status": "ok"}
+
+
+def test_postgres_configuration_reads_password_from_secret_file(tmp_path, monkeypatch):
+    secret_file = tmp_path / "postgres-password"
+    secret_file.write_text("secret with spaces", encoding="utf-8")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("POSTGRES_HOST", "database")
+    monkeypatch.setenv("POSTGRES_PASSWORD_FILE", str(secret_file))
+    monkeypatch.setenv("POSTGRES_USER", "ticketflow")
+    monkeypatch.setenv("POSTGRES_DB", "tickets")
+
+    uri = database_uri(Flask(__name__))
+
+    assert uri.drivername == "postgresql+psycopg"
+    assert uri.host == "database"
+    assert uri.database == "tickets"
+    assert uri.password == "secret with spaces"
+
+
+def test_existing_sqlite_schema_remains_usable(tmp_path):
+    database_path = tmp_path / "existing.sqlite3"
+    with sqlite3.connect(database_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE tickets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                number TEXT NOT NULL UNIQUE,
+                requester TEXT NOT NULL,
+                email TEXT NOT NULL,
+                category TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                description TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE ticket_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL,
+                requester TEXT NOT NULL,
+                email TEXT NOT NULL,
+                category TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                description TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                UNIQUE(ticket_id, version)
+            );
+            INSERT INTO tickets VALUES
+                (1, 'TCK-20260926-000001', 'Ana', 'ana@example.com', 'Soporte',
+                 'media', 'Ticket anterior', 'Persistido', '2026-09-26T10:00:00+00:00',
+                 '2026-09-26T10:00:00+00:00');
+            INSERT INTO ticket_versions VALUES
+                (1, 1, 1, 'Ana', 'ana@example.com', 'Soporte', 'media',
+                 'Ticket anterior', 'Persistido', '2026-09-26T10:00:00+00:00');
+            """
+        )
+
+    test_app = create_app(
+        {"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{database_path}"}
+    )
+    response = test_app.test_client().get("/tickets")
+
+    assert response.status_code == 200
+    assert b"TCK-20260926-000001" in response.data
+    assert b"Ticket anterior" in response.data
+    with test_app.app_context():
+        db.engine.dispose()

@@ -1,0 +1,30 @@
+services:
+  ticketflow:
+    image: ticketflow:local
+    ports:
+      - "5000:5000"
+    environment:
+      TICKETFLOW_DB: /data/ticketflow.sqlite3
+    volumes:
+      - ticketflow_test_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.ticketflow.sqlite == true
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  ticketflow_test_data:
+    name: ticketflow_test_data

@@ -6,8 +6,8 @@ services:
     environment:
       TICKETFLOW_DB: /data/ticketflow.sqlite3
     volumes:
-      - ticketflow_data:/data
+      - ticketflow_local_data:/data
     restart: unless-stopped
 
 volumes:
-  ticketflow_data:
+  ticketflow_local_data:
